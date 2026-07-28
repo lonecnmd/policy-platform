@@ -1,5 +1,5 @@
 window.POLICY_DATA = {
-  "updatedAt": "2026-07-25",
+  "updatedAt": "2026-07-28",
   "channels": [
     {
       "category": "A政府财政资金",
