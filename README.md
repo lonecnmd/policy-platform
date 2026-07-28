@@ -29,10 +29,19 @@ http://127.0.0.1:8765/
 ## 文件说明
 
 - `index.html`：平台页面入口
+- `policy-detail.html`：单项政策详情页入口
 - `styles.css`：页面样式
 - `app.js`：筛选、切换、渲染和交互逻辑
+- `policy-detail.js`：政策详情页渲染逻辑
 - `data.js`：政策结构化数据
+- `analysis-data.js`：政策解读、实施流程、责任单位和图谱候选映射数据
 - `files/`：政策 PDF 和公开附件下载文件
+
+如需重新生成政策解读数据，可运行：
+
+```bash
+node ../scripts/generate_policy_analysis.js
+```
 
 ## 数据来源与使用说明
 

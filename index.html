@@ -59,28 +59,33 @@
           <b></b>
           <span>政策文件</span>
           <b></b>
-          <span>简要解读</span>
+          <span>政策任务</span>
           <b></b>
-          <span>条款摘录</span>
+          <span>实施流程</span>
           <b></b>
-          <span>下载原文</span>
+          <span>图谱映射</span>
         </div>
       </section>
 
       <section class="tabs" aria-label="视图切换">
         <button class="tab active" data-view="cards" type="button">政策卡片</button>
+        <button class="tab" data-view="analysis" type="button">政策解读</button>
+        <button class="tab" data-view="graph" type="button">图谱框架</button>
         <button class="tab" data-view="matrix" type="button">渠道矩阵</button>
         <button class="tab" data-view="files" type="button">文件下载</button>
         <span id="resultCount"></span>
       </section>
 
       <section id="cardsView" class="policy-list"></section>
+      <section id="analysisView" class="analysis-view hidden"></section>
+      <section id="graphView" class="graph-view hidden"></section>
       <section id="matrixView" class="matrix-view hidden"></section>
       <section id="filesView" class="files-view hidden"></section>
     </section>
   </main>
 
   <script src="data.js"></script>
+  <script src="analysis-data.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
