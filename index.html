@@ -3,84 +3,88 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>数字深圳投资政策导航平台</title>
-  <meta name="description" content="按资金类别和资金渠道梳理数字深圳投资政策，支持检索、解读、条款摘录和文件下载。" />
+  <title>数字深圳投资政策知识平台</title>
+  <meta name="description" content="面向数字深圳工程的投资政策检索、资金渠道导航、政策图谱和政策详情解读平台。" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <header class="hero">
+  <header class="hero optimized-hero">
     <div class="hero-main">
       <div>
-        <div class="eyebrow">数字深圳投资政策导航</div>
-        <h1>资金渠道政策知识平台</h1>
-        <p>按四大资金类别、八类资金渠道组织政策文件，覆盖政府投资、中央预算内投资、超长期特别国债、专项资金、专项债券、政策性金融、基础设施REITs和社会投资等方向。</p>
-      </div>
-      <div class="hero-actions">
-        <a class="ghost-btn" href="#cardsView">浏览政策解读</a>
-        <a class="primary-btn" href="#filesView">查看文件附件</a>
+        <div class="eyebrow">数字深圳投资政策知识平台</div>
+        <h1>从资金渠道快速找到可执行政策依据</h1>
+        <p>围绕政府财政资金、政府债券资金和其他资金，沉淀政策文件、核心条款、实施流程、责任单位和图谱关系，帮助项目团队更快判断“能不能申报、找谁推进、形成什么材料”。</p>
       </div>
     </div>
-    <div class="stats" id="stats"></div>
+
+    <section class="guide-panel" aria-label="智能导办">
+      <label class="guide-search">
+        <span>智能导办</span>
+        <input id="guideSearch" type="search" placeholder="请输入关注领域，如“数据中心”“智慧城市”“监督检查”“REITs”" />
+      </label>
+      <button id="guideBtn" type="button">匹配政策</button>
+    </section>
+
+    <div class="stats visual-stats" id="stats"></div>
   </header>
 
-  <main class="app-shell">
-    <aside class="sidebar">
-      <div class="side-title">资金层级导航</div>
-      <div id="navTree"></div>
-    </aside>
-
-    <section class="content">
-      <section class="toolbar" aria-label="筛选工具栏">
-        <label>
-          资金类别
-          <select id="categoryFilter"></select>
-        </label>
-        <label>
-          资金渠道
-          <select id="channelFilter"></select>
-        </label>
-        <label>
-          标签
-          <select id="tagFilter"></select>
-        </label>
-        <label class="search-wrap">
-          搜索
-          <input id="searchInput" type="search" placeholder="搜索政策名称、渠道、摘要、条款" />
-        </label>
-        <button id="resetBtn" type="button">重置</button>
-      </section>
-
-      <section class="flow-band" aria-label="资金政策理解路径">
-        <div class="flow-title">查看路径</div>
-        <div class="flow">
-          <span>资金类别</span>
-          <b></b>
-          <span>资金渠道</span>
-          <b></b>
-          <span>政策文件</span>
-          <b></b>
-          <span>简要解读</span>
-          <b></b>
-          <span>条款摘录</span>
-          <b></b>
-          <span>下载原文</span>
+  <main class="optimized-shell">
+    <section class="section-band">
+      <div class="section-head">
+        <div>
+          <span class="section-kicker">资金渠道导航</span>
+          <h2>按资金来源进入政策体系</h2>
         </div>
-      </section>
+        <button id="clearNavBtn" type="button">查看全部</button>
+      </div>
+      <div id="fundTiles" class="fund-tiles"></div>
+    </section>
 
-      <section class="tabs" aria-label="视图切换">
-        <button class="tab active" data-view="cards" type="button">政策卡片</button>
-        <button class="tab" data-view="matrix" type="button">渠道矩阵</button>
-        <button class="tab" data-view="files" type="button">文件下载</button>
-        <span id="resultCount"></span>
-      </section>
+    <section class="toolbar optimized-toolbar" aria-label="筛选工具栏">
+      <label>
+        资金类别
+        <select id="categoryFilter"></select>
+      </label>
+      <label>
+        资金渠道
+        <select id="channelFilter"></select>
+      </label>
+      <label>
+        标签
+        <select id="tagFilter"></select>
+      </label>
+      <label class="search-wrap">
+        关键词
+        <input id="searchInput" type="search" placeholder="搜索政策名称、发布单位、文号、任务、条款" />
+      </label>
+      <button id="resetBtn" type="button">重置</button>
+    </section>
 
+    <section id="bookmarkBand" class="section-band compact-band hidden"></section>
+
+    <section class="section-band">
+      <div class="section-head result-head">
+        <div>
+          <span class="section-kicker">结果展示</span>
+          <h2>政策清单与图谱</h2>
+        </div>
+        <div class="tabs segmented-tabs" aria-label="视图切换">
+          <button class="tab active" data-view="cards" type="button">列表视图</button>
+          <button class="tab" data-view="graph" type="button">图谱视图</button>
+          <button class="tab" data-view="compare" type="button">对标分析</button>
+          <button class="tab" data-view="files" type="button">文件下载</button>
+        </div>
+      </div>
+      <div id="resultCount" class="result-count"></div>
       <section id="cardsView" class="policy-list"></section>
-      <section id="matrixView" class="matrix-view hidden"></section>
+      <section id="graphView" class="graph-view hidden"></section>
+      <section id="compareView" class="compare-view hidden"></section>
       <section id="filesView" class="files-view hidden"></section>
     </section>
   </main>
 
   <script src="data.js"></script>
+  <script src="analysis-data.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
