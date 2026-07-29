@@ -13,11 +13,11 @@
       <div>
         <div class="eyebrow">数字深圳投资政策导航</div>
         <h1>资金渠道政策知识平台</h1>
-        <p>按政府财政资金、政府债券资金和其他资金三组来源，组织中央预算内投资、上级财政专项资金、市本级财政投资、超长期特别国债及“两重”建设、地方政府专项债券、政策性金融、基础设施REITs和社会投资等八类资金渠道。</p>
+        <p>按市本级财政资金、上级财政资金、政府债券资金和社会资本等层级组织政策文件，快速查看解读、条款摘录和下载原文。</p>
       </div>
       <div class="hero-actions">
-        <a class="ghost-btn" href="#cardsView">浏览政策解读</a>
-        <a class="primary-btn" href="#filesView">查看文件附件</a>
+        <a class="ghost-btn" href="#policyList">浏览政策解读</a>
+        <a class="primary-btn" href="#downloads">查看公开附件</a>
       </div>
     </div>
     <div class="stats" id="stats"></div>
@@ -59,33 +59,28 @@
           <b></b>
           <span>政策文件</span>
           <b></b>
-          <span>政策任务</span>
+          <span>简要解读</span>
           <b></b>
-          <span>实施流程</span>
+          <span>条款摘录</span>
           <b></b>
-          <span>图谱映射</span>
+          <span>下载原文</span>
         </div>
       </section>
 
       <section class="tabs" aria-label="视图切换">
         <button class="tab active" data-view="cards" type="button">政策卡片</button>
-        <button class="tab" data-view="analysis" type="button">政策解读</button>
-        <button class="tab" data-view="graph" type="button">图谱框架</button>
         <button class="tab" data-view="matrix" type="button">渠道矩阵</button>
         <button class="tab" data-view="files" type="button">文件下载</button>
         <span id="resultCount"></span>
       </section>
 
       <section id="cardsView" class="policy-list"></section>
-      <section id="analysisView" class="analysis-view hidden"></section>
-      <section id="graphView" class="graph-view hidden"></section>
       <section id="matrixView" class="matrix-view hidden"></section>
       <section id="filesView" class="files-view hidden"></section>
     </section>
   </main>
 
   <script src="data.js"></script>
-  <script src="analysis-data.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
