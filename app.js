@@ -77,7 +77,10 @@ function renderNav() {
 
 function renderCards(list) {
   $("cardsView").innerHTML = list.map((p) => {
-    const firstQuote = p.quotes[0] || "未从本地文本中稳定抽取到资金管理条款，建议结合原文复核。";
+    const excerptItems = (p.quotes || []).slice(0, 2);
+    const excerpts = excerptItems.length
+      ? `<ul class="excerpt-list">${excerptItems.map((quote) => `<li>${escapeHtml(quote)}</li>`).join("")}</ul>`
+      : "未从报告附录中稳定匹配到相关原文摘录，建议结合原文复核。";
     const fileLink = p.file ? `<a class="download" href="${encodePath(p.file)}" download>下载原文</a>` : "";
     const attachmentLinks = (p.attachments || []).map((a) => `<a class="attachment" href="${encodePath(a.file)}" download>${escapeHtml(a.label)}</a>`).join("");
     return `<article class="policy-card">
@@ -93,7 +96,7 @@ function renderCards(list) {
       </div>
       <div class="tag-row">${(p.tags.length ? p.tags : ["待人工补充标签"]).map((tag) => `<span class="chip tag">${escapeHtml(tag)}</span>`).join("")}</div>
       <p class="summary">${escapeHtml(p.summary || "待补充解读。")}</p>
-      <div class="quote-box"><div class="quote-title">资金管理摘录</div>${escapeHtml(firstQuote)}</div>
+      <div class="quote-box"><div class="quote-title">相关原文摘录</div>${excerpts}</div>
       ${attachmentLinks ? `<div class="attachments">${attachmentLinks}</div>` : ""}
     </article>`;
   }).join("") || `<div class="policy-card">没有匹配的政策，试试清空筛选条件。</div>`;

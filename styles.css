@@ -335,6 +335,13 @@ button:hover, .primary-btn:hover, .ghost-btn:hover { filter: brightness(.98); }
   color: #244c7b;
   margin-bottom: 5px;
 }
+.excerpt-list {
+  margin: 0;
+  padding-left: 18px;
+}
+.excerpt-list li + li {
+  margin-top: 6px;
+}
 .attachments {
   margin-top: 10px;
   display: flex;
