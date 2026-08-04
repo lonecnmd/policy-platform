@@ -1,14 +1,14 @@
-const data = window.POLICY_DATA;
+const data = window.POLICY_DATA || { channels: [], policies: [] };
 const analysisData = window.POLICY_ANALYSIS || { architectureUnits: [], policyAnalyses: [], relationships: [] };
 let state = { category: "全部", channel: "全部", tag: "全部", search: "", view: "cards" };
 
 const $ = (id) => document.getElementById(id);
-const policies = data.policies;
+const policies = Array.isArray(data.policies) ? data.policies : [];
 const analyses = analysisData.policyAnalyses || [];
 const analysisByPolicyId = new Map(analyses.map((item) => [item.policyId, item]));
 const unitById = new Map((analysisData.architectureUnits || []).map((unit) => [unit.id, unit]));
-const categories = [...new Set(data.channels.map((d) => d.category))];
-const channels = [...new Set(data.channels.map((d) => d.channel))];
+const categories = [...new Set((data.channels || []).map((d) => d.category))];
+const channels = [...new Set((data.channels || []).map((d) => d.channel))];
 const tags = [...new Set(policies.flatMap((p) => p.tags))].filter(Boolean).sort();
 
 function byFilter(p) {
