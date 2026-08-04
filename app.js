@@ -1,29 +1,42 @@
 const data = window.POLICY_DATA;
-const analysisData = window.POLICY_ANALYSIS || { architectureUnits: [], policyAnalyses: [] };
+const analysisData = window.POLICY_ANALYSIS || { architectureUnits: [], policyAnalyses: [], relationships: [] };
+let state = { category: "全部", channel: "全部", tag: "全部", search: "", view: "cards" };
 
 const $ = (id) => document.getElementById(id);
-const rawPolicies = data.policies || [];
+const policies = data.policies;
 const analyses = analysisData.policyAnalyses || [];
 const analysisByPolicyId = new Map(analyses.map((item) => [item.policyId, item]));
 const unitById = new Map((analysisData.architectureUnits || []).map((unit) => [unit.id, unit]));
 const categories = [...new Set(data.channels.map((d) => d.category))];
 const channels = [...new Set(data.channels.map((d) => d.channel))];
-const tags = [...new Set(rawPolicies.flatMap((p) => p.tags || []))].filter(Boolean).sort();
-const displayCategoryCounts = {
-  "A政府财政资金": 15,
-  "C其他资金": 11,
-};
+const tags = [...new Set(policies.flatMap((p) => p.tags))].filter(Boolean).sort();
 
-let state = { category: "全部", channel: "全部", tag: "全部", search: "", view: "cards" };
-let favorites = new Set(JSON.parse(localStorage.getItem("policyFavorites") || "[]"));
-let recent = JSON.parse(localStorage.getItem("recentPolicies") || "[]");
+function byFilter(p) {
+  const q = state.search.trim().toLowerCase();
+  const analysis = analysisByPolicyId.get(p.id);
+  const analysisText = analysis ? [
+    analysis.docNo,
+    analysis.issuingAuthority,
+    analysis.issueDate,
+    analysis.effectiveDate,
+    analysis.expiryDate,
+    analysis.responsibleUnits?.join(" "),
+    analysis.implementationFlow?.join(" "),
+    analysis.policyTasks?.map((task) => task.description).join(" "),
+  ].join(" ") : "";
+  const inSearch = !q || [p.id, p.title, p.category, p.channel, p.summary, (p.quotes || []).join(" "), (p.tags || []).join(" "), analysisText].join(" ").toLowerCase().includes(q);
+  return (state.category === "全部" || p.category === state.category)
+    && (state.channel === "全部" || p.channel === state.channel)
+    && (state.tag === "全部" || (p.tags || []).includes(state.tag))
+    && inSearch;
+}
+
+function fillSelect(el, values, current = "全部") {
+  el.innerHTML = ["全部", ...values].map((v) => `<option value="${escapeHtml(v)}"${v === current ? " selected" : ""}>${escapeHtml(v)}</option>`).join("");
+}
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
-}
-
-function normalize(value) {
-  return String(value || "").replace(/\s+/g, "").replace(/[《》（）()【】\[\]、，。·_\-—~～:：;；"'“”]/g, "").toLowerCase();
 }
 
 function encodePath(path) {
@@ -34,372 +47,340 @@ function detailUrl(policy) {
   return `policy-detail.html?id=${encodeURIComponent(policy.id)}`;
 }
 
-function detailReady(policy) {
+function canOpenDetail(policy) {
   return Boolean(analysisByPolicyId.get(policy.id)?.hasDetailPage);
 }
 
-function makePolicyGroups() {
-  const map = new Map();
-  rawPolicies.forEach((policy) => {
-    const key = normalize(policy.title);
-    const current = map.get(key) || {
-      key,
-      policy,
-      members: [],
-      categories: new Set(),
-      channels: new Set(),
-      tags: new Set(),
-      qualityFlags: new Set(),
-    };
-    current.members.push(policy);
-    current.categories.add(policy.category);
-    current.channels.add(policy.channel);
-    (policy.tags || []).forEach((tag) => current.tags.add(tag));
-    (analysisByPolicyId.get(policy.id)?.qualityFlags || []).forEach((flag) => current.qualityFlags.add(flag));
-    if (!detailReady(current.policy) && detailReady(policy)) current.policy = policy;
-    map.set(key, current);
-  });
-  return [...map.values()].map((group) => ({
-    ...group,
-    categories: [...group.categories],
-    channels: [...group.channels],
-    tags: [...group.tags],
-    qualityFlags: [...group.qualityFlags],
-    analysis: analysisByPolicyId.get(group.policy.id),
-  }));
+function renderPolicyTitle(policy) {
+  const title = `<span class="policy-id">${escapeHtml(policy.id)}</span>${escapeHtml(policy.title)}`;
+  return canOpenDetail(policy)
+    ? `<a class="policy-title-link" href="${detailUrl(policy)}">${title}</a>`
+    : `${title}<span class="chip muted-chip">信息较少，暂不单独成页</span>`;
 }
 
-const policyGroups = makePolicyGroups();
-
-function groupSearchText(group) {
-  const analysis = group.analysis;
-  return [
-    group.policy.id,
-    group.policy.title,
-    group.categories.join(" "),
-    group.channels.join(" "),
-    group.tags.join(" "),
-    group.policy.summary,
-    analysis?.issuingAuthority,
-    analysis?.docNo,
-    analysis?.issueDate,
-    analysis?.policyHighlights?.map((item) => `${item.title} ${item.description}`).join(" "),
-    analysis?.coreClauses?.map((item) => `${item.label} ${item.title} ${item.summary}`).join(" "),
-  ].join(" ").toLowerCase();
+function renderList(values, className = "") {
+  return values?.length
+    ? `<ul class="${className}">${values.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
+    : `<div class="empty-note">待补充。</div>`;
 }
 
-function byFilter(group) {
-  const q = state.search.trim().toLowerCase();
-  return (state.category === "全部" || group.categories.includes(state.category))
-    && (state.channel === "全部" || group.channels.includes(state.channel))
-    && (state.tag === "全部" || group.tags.includes(state.tag))
-    && (!q || groupSearchText(group).includes(q));
+function renderProcess(steps) {
+  return steps?.length
+    ? `<div class="process-line">${steps.map((step, index) => {
+        const item = typeof step === "string" ? { title: step } : step;
+        return `
+        <div class="process-step">
+          <span>${item.order || index + 1}</span>
+          <strong>${escapeHtml(item.title)}</strong>
+          ${item.action ? `<p>${escapeHtml(item.action)}</p>` : ""}
+          ${item.leadUnit ? `<small>牵头：${escapeHtml(item.leadUnit)}</small>` : ""}
+        </div>`;
+      }).join("")}</div>`
+    : `<div class="empty-note">暂未形成稳定流程。</div>`;
 }
 
-function filteredGroups() {
-  return policyGroups.filter(byFilter);
+function renderTasks(tasks) {
+  return tasks?.length
+    ? `<div class="task-list">${tasks.map((task) => `
+        <div class="task-item">
+          <strong>${escapeHtml(task.title)}</strong>
+          <p>${escapeHtml(task.description)}</p>
+          <span class="chip">${escapeHtml(task.status)}</span>
+        </div>`).join("")}</div>`
+    : `<div class="empty-note">待补充政策任务。</div>`;
 }
 
-function rawPolicySearchText(policy) {
-  const analysis = analysisByPolicyId.get(policy.id);
-  return [
-    policy.id,
-    policy.title,
-    policy.category,
-    policy.channel,
-    (policy.tags || []).join(" "),
-    policy.summary,
-    analysis?.issuingAuthority,
-    analysis?.docNo,
-    analysis?.issueDate,
-    analysis?.policyHighlights?.map((item) => `${item.title} ${item.description}`).join(" "),
-    analysis?.coreClauses?.map((item) => `${item.label} ${item.title} ${item.summary}`).join(" "),
-  ].join(" ").toLowerCase();
+function renderMappedUnits(mappedUnits) {
+  return mappedUnits?.length
+    ? `<div class="unit-chip-list">${mappedUnits.map((mapped) => {
+        const unit = unitById.get(mapped.unitId);
+        return `<span class="unit-chip">${escapeHtml(unit?.name || mapped.unitId)} · ${escapeHtml(mapped.reviewStatus)}</span>`;
+      }).join("")}</div>`
+    : `<div class="empty-note">暂无图谱映射。</div>`;
 }
 
-function rawPolicyMatches(policy) {
-  const q = state.search.trim().toLowerCase();
-  return (state.category === "全部" || policy.category === state.category)
-    && (state.channel === "全部" || policy.channel === state.channel)
-    && (state.tag === "全部" || (policy.tags || []).includes(state.tag))
-    && (!q || rawPolicySearchText(policy).includes(q));
-}
-
-function displayPolicyCount() {
-  const hasFocusedCategory = state.category !== "全部" && state.channel === "全部" && state.tag === "全部" && !state.search.trim();
-  if (hasFocusedCategory && displayCategoryCounts[state.category]) return displayCategoryCounts[state.category];
-  return rawPolicies.filter(rawPolicyMatches).length;
-}
-
-function fillSelect(el, values, current = "全部") {
-  el.innerHTML = ["全部", ...values].map((v) => `<option value="${escapeHtml(v)}"${v === current ? " selected" : ""}>${escapeHtml(v)}</option>`).join("");
-}
-
-function categoryClass(value) {
-  if (value?.startsWith("A")) return "cat-a";
-  if (value?.startsWith("B")) return "cat-b";
-  if (value?.startsWith("C")) return "cat-c";
-  return "";
-}
-
-function renderStats(groups) {
-  const visibleChannels = new Set(groups.flatMap((group) => group.channels));
-  const visibleTags = new Set(groups.flatMap((group) => group.tags));
-  const detailCount = groups.filter((group) => detailReady(group.policy)).length;
-  $("stats").innerHTML = [
-    ["政策档案", displayPolicyCount(), "按原始文件总量统计"],
-    ["资金渠道", visibleChannels.size, "按 A/B/C 来源组织"],
-    ["结构标签", visibleTags.size, "支持点击筛选"],
-    ["可详解政策", detailCount, "含流程和原文"],
-  ].map(([label, value, sub]) => `
-    <div class="stat visual-stat">
-      <strong>${escapeHtml(value)}</strong>
-      <span>${escapeHtml(label)}</span>
-      <small>${escapeHtml(sub)}</small>
-    </div>`).join("");
-}
-
-function renderFundTiles() {
-  $("fundTiles").innerHTML = categories.map((category) => {
-    const categoryChannels = data.channels.filter((item) => item.category === category);
-    const count = displayCategoryCounts[category] || rawPolicies.filter((policy) => policy.category === category).length;
-    return `<article class="fund-tile ${categoryClass(category)}">
-      <button class="fund-main" data-category="${escapeHtml(category)}">
-        <span>${escapeHtml(category)}</span>
-        <strong>${count}</strong>
-      </button>
-      <div class="fund-subtiles">
-        ${categoryChannels.map(({ channel }) => {
-          const channelCount = rawPolicies.filter((policy) => policy.channel === channel).length;
-          return `<button data-channel="${escapeHtml(channel)}">${escapeHtml(channel)}<span>${channelCount}</span></button>`;
-        }).join("")}
-      </div>
-    </article>`;
-  }).join("");
-}
-
-function highlightFlags(flags) {
-  return (flags || []).slice(0, 2).map((flag) => `<span class="status-flag">${escapeHtml(flag)}</span>`).join("");
-}
-
-function renderPolicyCard(group) {
-  const policy = group.policy;
-  const analysis = group.analysis;
-  const ready = detailReady(policy);
-  const href = ready ? detailUrl(policy) : policy.file ? encodePath(policy.file) : "#";
-  const title = policy.title.replace(/[（）][^（）]*?[,，]?\d{4}年?[）]/g, "").replace(/（国家发展改革委令第10号，2023年）/, "");
-  const highlights = (analysis?.policyHighlights || []).slice(0, 3);
-  const meta = [
-    analysis?.issuingAuthority || "发布单位待校准",
-    analysis?.issueDate || "发布时间待校准",
-    analysis?.docNo || "文号待校准",
-  ].join(" | ");
-  return `<article class="policy-card refined-card ${categoryClass(group.categories[0])}">
-    <div class="policy-card-top">
-      <button class="favorite-btn ${favorites.has(policy.id) ? "active" : ""}" data-favorite="${escapeHtml(policy.id)}" title="收藏">★</button>
-      <div>
-        <h3 class="policy-title hover-wrap">
-          <a class="policy-title-link" href="${href}" data-policy-link="${escapeHtml(policy.id)}">${escapeHtml(title)}</a>
-          <span class="hover-card">
-            <strong>${escapeHtml(policy.title)}</strong>
-            <span>${escapeHtml(meta)}</span>
-            <em>${escapeHtml((highlights[0]?.description || policy.summary || "").slice(0, 92))}</em>
-          </span>
-        </h3>
-        <div class="policy-meta">${escapeHtml(meta)}</div>
-      </div>
-      <div class="policy-actions">
-        ${ready ? `<a class="detail-btn" href="${detailUrl(policy)}">进入详情</a>` : `<span class="status-flag">信息较少</span>`}
-        ${policy.file ? `<a class="download" href="${encodePath(policy.file)}" download>下载原文</a>` : ""}
-      </div>
+function renderPolicyAnalysisBlock(p, compact = false) {
+  const analysis = analysisByPolicyId.get(p.id);
+  if (!analysis) return `<div class="empty-note">尚未生成政策解读档案。</div>`;
+  return `<div class="analysis-block ${compact ? "compact" : ""}">
+    <div class="analysis-grid">
+      <div><span>发布单位</span><strong>${escapeHtml(analysis.issuingAuthority)}</strong></div>
+      <div><span>发布时间</span><strong>${escapeHtml(analysis.issueDate)}</strong></div>
+      <div><span>文号</span><strong>${escapeHtml(analysis.docNo)}</strong></div>
+      <div><span>施行时间</span><strong>${escapeHtml(analysis.effectiveDate)}</strong></div>
+      <div><span>有效期</span><strong>${escapeHtml(analysis.expiryDate)}</strong></div>
+      <div><span>抽取状态</span><strong>${escapeHtml(analysis.extractionStatus)}</strong></div>
     </div>
-    <div class="tag-row">
-      ${group.channels.map((channel) => `<button class="chip channel chip-button ${categoryClass(channel)}" data-channel="${escapeHtml(channel)}">${escapeHtml(channel)}</button>`).join("")}
-      ${group.tags.slice(0, 4).map((tag) => `<button class="chip tag chip-button" data-tag="${escapeHtml(tag)}">#${escapeHtml(tag)}</button>`).join("")}
-      ${group.members.length > 1 ? `<span class="chip">合并 ${group.members.length} 条适用口径</span>` : ""}
-      ${highlightFlags(group.qualityFlags)}
+    <div class="analysis-section">
+      <h3>责任单位</h3>
+      ${renderList(analysis.responsibleUnits)}
     </div>
-    <p class="summary">${escapeHtml(policy.summary || "待补充政策解读。")}</p>
-    <div class="highlight-grid">
-      ${highlights.map((item) => `<div class="highlight-item ${item.tone || ""}"><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.description)}</span></div>`).join("")}
+    <div class="analysis-section">
+      <h3>实施流程</h3>
+      ${renderProcess(analysis.implementationFlowDetails || analysis.implementationFlow)}
     </div>
-  </article>`;
-}
-
-function renderCards(groups) {
-  $("cardsView").innerHTML = groups.map(renderPolicyCard).join("") || `<div class="policy-card">没有匹配的政策，请调整筛选条件。</div>`;
-}
-
-function renderGraph(groups) {
-  const visibleIds = new Set(groups.flatMap((group) => group.members.map((policy) => policy.id)));
-  const relationships = analyses
-    .filter((analysis) => visibleIds.has(analysis.policyId))
-    .flatMap((analysis) => analysis.mappedUnits.map((mapped) => ({ ...mapped, policyId: analysis.policyId })));
-  const visibleChannels = data.channels.map(({ channel }) => ({
-    channel,
-    count: groups.filter((group) => group.channels.includes(channel)).length,
-  })).filter((item) => item.count > 0);
-  const units = analysisData.architectureUnits || [];
-  const width = 1000;
-  const height = Math.max(380, Math.max(visibleChannels.length, units.length) * 48 + 90);
-  const leftX = 190;
-  const rightX = 770;
-  const channelY = (index) => 60 + index * ((height - 120) / Math.max(visibleChannels.length - 1, 1));
-  const unitY = (index) => 60 + index * ((height - 120) / Math.max(units.length - 1, 1));
-  const channelIndex = new Map(visibleChannels.map((item, index) => [item.channel, index]));
-  const unitIndex = new Map(units.map((unit, index) => [unit.id, index]));
-  const rawById = new Map(rawPolicies.map((policy) => [policy.id, policy]));
-  const links = relationships.slice(0, 120).map((rel) => {
-    const policy = rawById.get(rel.policyId);
-    if (!policy || !channelIndex.has(policy.channel) || !unitIndex.has(rel.unitId)) return "";
-    const x1 = leftX + 122;
-    const y1 = channelY(channelIndex.get(policy.channel));
-    const x2 = rightX - 118;
-    const y2 = unitY(unitIndex.get(rel.unitId));
-    return `<path d="M ${x1} ${y1} C ${x1 + 150} ${y1}, ${x2 - 150} ${y2}, ${x2} ${y2}" />`;
-  }).join("");
-
-  $("graphView").innerHTML = `<section class="kg-panel hero-kg">
-    <div class="kg-title">资金流向图谱</div>
-    <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="资金渠道与平台架构关系图">
-      <g class="kg-links">${links}</g>
-      <g class="kg-nodes">
-        ${visibleChannels.map((item, index) => `<g transform="translate(${leftX},${channelY(index)})"><circle r="9"></circle><text x="-12" y="5" text-anchor="end">${escapeHtml(item.channel)}</text><text x="18" y="5">${item.count}项</text></g>`).join("")}
-        ${units.map((unit, index) => `<g transform="translate(${rightX},${unitY(index)})"><circle r="9"></circle><text x="18" y="5">${escapeHtml(unit.name)}</text></g>`).join("")}
-      </g>
-    </svg>
-  </section>`;
-}
-
-function renderCompare(groups) {
-  const cityRules = [
-    ["深圳", /深圳/],
-    ["北京", /北京/],
-    ["上海", /上海/],
-    ["广东", /广东/],
-    ["国家", /国务院|国家发展改革委|财政部|中央/],
-  ];
-  const rows = cityRules.map(([name, pattern]) => ({
-    name,
-    count: groups.filter((group) => pattern.test(group.policy.title + " " + (group.analysis?.issuingAuthority || ""))).length,
-  }));
-  const max = Math.max(...rows.map((row) => row.count), 1);
-  $("compareView").innerHTML = `<div class="compare-grid">
-    ${rows.map((row) => `<article class="compare-card"><strong>${escapeHtml(row.name)}</strong><span>${row.count} 项政策</span><b style="width:${Math.max(8, row.count / max * 100)}%"></b></article>`).join("")}
+    <div class="analysis-section">
+      <h3>政策任务</h3>
+      ${renderTasks(analysis.policyTasks)}
+    </div>
+    <div class="analysis-section">
+      <h3>图谱映射</h3>
+      ${renderMappedUnits(analysis.mappedUnits)}
+    </div>
+    <p class="review-note">${escapeHtml(analysis.validityNote)}</p>
   </div>`;
 }
 
-function renderFiles(groups) {
-  $("filesView").innerHTML = groups.map((group) => {
-    const policy = group.policy;
-    return `<div class="file-row">
-      <strong>${escapeHtml(policy.id)}</strong>
-      <div>
-        <div>${detailReady(policy) ? `<a class="inline-link" href="${detailUrl(policy)}">${escapeHtml(policy.title)}</a>` : escapeHtml(policy.title)}</div>
-        <small>${escapeHtml(group.channels.join(" / "))}</small>
+function renderStats() {
+  const categoryCount = categories.length;
+  const channelCount = channels.length;
+  const tagCount = tags.length;
+  const fileCount = policies.reduce((sum, p) => sum + (p.file ? 1 : 0) + (p.attachments?.length || 0), 0);
+  $("stats").innerHTML = [
+    ["政策记录", policies.length],
+    ["政策解读", analyses.length],
+    ["图谱单元", analysisData.architectureUnits?.length || 0],
+    ["资金类别", categoryCount],
+    ["资金渠道", channelCount],
+    ["结构标签", tagCount],
+    ["可下载文件", fileCount],
+  ].map(([label, value]) => `<div class="stat"><strong>${escapeHtml(value)}</strong><span>${label}</span></div>`).join("");
+}
+
+function renderNav() {
+  const grouped = categories.map((category) => ({
+    category,
+    count: policies.filter((p) => p.category === category).length,
+    channels: data.channels.filter((c) => c.category === category).map((c) => ({
+      name: c.channel,
+      count: policies.filter((p) => p.channel === c.channel).length,
+    })),
+  }));
+  $("navTree").innerHTML = grouped.map((g) => `
+    <div class="nav-group">
+      <button class="nav-category ${state.category === g.category ? "active" : ""}" data-category="${escapeHtml(g.category)}">
+        <span>${escapeHtml(g.category)}</span><span class="count-pill">${g.count}</span>
+      </button>
+      ${g.channels.map((c) => `
+        <button class="nav-channel ${state.channel === c.name ? "active" : ""}" data-channel="${escapeHtml(c.name)}">
+          ${escapeHtml(c.name)} <span class="count-pill">${c.count}</span>
+        </button>`).join("")}
+    </div>`).join("");
+  document.querySelectorAll("[data-category]").forEach((btn) => btn.addEventListener("click", () => {
+    state.category = btn.dataset.category;
+    state.channel = "全部";
+    render();
+  }));
+  document.querySelectorAll("[data-channel]").forEach((btn) => btn.addEventListener("click", () => {
+    state.channel = btn.dataset.channel;
+    const found = data.channels.find((c) => c.channel === state.channel);
+    state.category = found?.category || "全部";
+    render();
+  }));
+}
+
+function renderCards(list) {
+  $("cardsView").innerHTML = list.map((p) => {
+    const excerptItems = (p.quotes || []).slice(0, 2);
+    const excerpts = excerptItems.length
+      ? `<ul class="excerpt-list">${excerptItems.map((quote) => `<li>${escapeHtml(quote)}</li>`).join("")}</ul>`
+      : "未从报告附录中稳定匹配到相关原文摘录，建议结合原文复核。";
+    const fileLink = p.file ? `<a class="download" href="${encodePath(p.file)}" download>下载原文</a>` : "";
+    const attachmentLinks = (p.attachments || []).map((a) => `<a class="attachment" href="${encodePath(a.file)}" download>${escapeHtml(a.label)}</a>`).join("");
+    return `<article class="policy-card">
+      <div class="policy-head">
+        <h2 class="policy-title">${renderPolicyTitle(p)}</h2>
+        <div class="policy-actions">
+          ${canOpenDetail(p) ? `<a class="detail-btn" href="${detailUrl(p)}">进入详情</a>` : ""}
+          ${fileLink}
+        </div>
       </div>
-      ${policy.file ? `<a class="download" href="${encodePath(policy.file)}" download>下载</a>` : ""}
+      <div class="meta-row">
+        <span class="chip category">${escapeHtml(p.category)}</span>
+        <span class="chip channel">${escapeHtml(p.channel)}</span>
+        <span class="chip">标签 ${p.tagCount}</span>
+        <span class="chip">${escapeHtml(p.sourceNote)}</span>
+      </div>
+      <div class="tag-row">${(p.tags.length ? p.tags : ["待人工补充标签"]).map((tag) => `<span class="chip tag">${escapeHtml(tag)}</span>`).join("")}</div>
+      <p class="summary">${escapeHtml(p.summary || "待补充解读。")}</p>
+      <div class="quote-box"><div class="quote-title">相关原文摘录</div>${excerpts}</div>
+      <details class="policy-detail">
+        <summary>展开政策解读、流程和图谱映射</summary>
+        ${renderPolicyAnalysisBlock(p, true)}
+      </details>
+      ${attachmentLinks ? `<div class="attachments">${attachmentLinks}</div>` : ""}
+    </article>`;
+  }).join("") || `<div class="policy-card">没有匹配的政策，试试清空筛选条件。</div>`;
+}
+
+function renderAnalysis(list) {
+  $("analysisView").innerHTML = list.map((p) => `
+    <article class="policy-card analysis-card">
+      <div class="policy-head">
+        <h2 class="policy-title">${renderPolicyTitle(p)}</h2>
+        <div class="policy-actions">
+          ${canOpenDetail(p) ? `<a class="detail-btn" href="${detailUrl(p)}">进入详情</a>` : ""}
+          ${p.file ? `<a class="download" href="${encodePath(p.file)}" download>下载原文</a>` : ""}
+        </div>
+      </div>
+      <div class="meta-row">
+        <span class="chip category">${escapeHtml(p.category)}</span>
+        <span class="chip channel">${escapeHtml(p.channel)}</span>
+      </div>
+      <p class="summary">${escapeHtml(p.summary || "待补充解读。")}</p>
+      ${renderPolicyAnalysisBlock(p)}
+    </article>`).join("") || `<div class="policy-card">没有匹配的政策解读。</div>`;
+}
+
+function renderGraph(list) {
+  const visibleIds = new Set(list.map((policy) => policy.id));
+  const visibleAnalyses = analyses.filter((analysis) => visibleIds.has(analysis.policyId));
+  const relationships = visibleAnalyses.flatMap((analysis) => analysis.mappedUnits.map((mapped) => ({
+    ...mapped,
+    policyId: analysis.policyId,
+  })));
+  const unitCards = (analysisData.architectureUnits || []).map((unit) => {
+    const related = relationships.filter((item) => item.unitId === unit.id);
+    const relatedPolicies = related.map((item) => policies.find((policy) => policy.id === item.policyId)).filter(Boolean);
+    return `<article class="graph-unit">
+      <div class="unit-layer">${escapeHtml(unit.layer)}</div>
+      <h3>${escapeHtml(unit.name)} <span class="count-pill">${relatedPolicies.length}</span></h3>
+      <p>${escapeHtml(unit.purpose)}</p>
+      <div class="mini-list">
+        ${relatedPolicies.slice(0, 8).map((policy) => `<div class="mini-item"><span>${escapeHtml(policy.id)} ${escapeHtml(policy.title)}</span><span>候选映射</span></div>`).join("") || "当前筛选下暂无支撑政策"}
+      </div>
+    </article>`;
+  }).join("");
+
+  $("graphView").innerHTML = `
+    <section class="graph-summary">
+      ${renderKnowledgeGraph(list, relationships)}
+      <div class="graph-chain">
+        ${["政策文件", "原文条款", "政策任务", "任务簇", "平台架构单元", "总体设计响应", "交付成果"].map((label) => `<span>${label}</span>`).join("<b></b>")}
+      </div>
+      <div class="graph-meta">
+        <span>当前筛选政策：${list.length}</span>
+        <span>候选关系：${relationships.length}</span>
+        <span>${escapeHtml(analysisData.method || "候选图谱")}</span>
+      </div>
+    </section>
+    <section class="graph-grid">${unitCards}</section>`;
+}
+
+function renderKnowledgeGraph(list, relationships) {
+  const visibleChannels = data.channels
+    .map(({ channel }) => ({
+      channel,
+      count: list.filter((policy) => policy.channel === channel).length,
+    }))
+    .filter((item) => item.count > 0);
+  const units = analysisData.architectureUnits || [];
+  const width = 960;
+  const height = Math.max(340, Math.max(visibleChannels.length, units.length) * 46 + 70);
+  const leftX = 170;
+  const rightX = 760;
+  const channelY = (index) => 50 + index * ((height - 100) / Math.max(visibleChannels.length - 1, 1));
+  const unitY = (index) => 50 + index * ((height - 100) / Math.max(units.length - 1, 1));
+  const channelIndex = new Map(visibleChannels.map((item, index) => [item.channel, index]));
+  const unitIndex = new Map(units.map((unit, index) => [unit.id, index]));
+  const policyById = new Map(policies.map((policy) => [policy.id, policy]));
+  const links = relationships.slice(0, 90).map((rel) => {
+    const policy = policyById.get(rel.policyId);
+    if (!policy || !channelIndex.has(policy.channel) || !unitIndex.has(rel.unitId)) return "";
+    const x1 = leftX + 110;
+    const y1 = channelY(channelIndex.get(policy.channel));
+    const x2 = rightX - 110;
+    const y2 = unitY(unitIndex.get(rel.unitId));
+    return `<path d="M ${x1} ${y1} C ${x1 + 150} ${y1}, ${x2 - 150} ${y2}, ${x2} ${y2}" />`;
+  }).join("");
+  return `<div class="kg-panel">
+    <div class="kg-title">资金渠道到平台架构的候选关系</div>
+    <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="资金渠道到平台架构单元知识图谱">
+      <g class="kg-links">${links}</g>
+      <g class="kg-nodes">
+        ${visibleChannels.map((item, index) => `
+          <g transform="translate(${leftX},${channelY(index)})">
+            <circle r="8"></circle>
+            <text x="-12" y="5" text-anchor="end">${escapeHtml(item.channel)}</text>
+            <text x="16" y="5">${item.count}条</text>
+          </g>`).join("")}
+        ${units.map((unit, index) => `
+          <g transform="translate(${rightX},${unitY(index)})">
+            <circle r="8"></circle>
+            <text x="16" y="5">${escapeHtml(unit.name)}</text>
+          </g>`).join("")}
+      </g>
+    </svg>
+  </div>`;
+}
+
+function renderMatrix(list) {
+  $("matrixView").innerHTML = data.channels.map(({ category, channel }) => {
+    const items = list.filter((p) => p.channel === channel);
+    return `<section class="matrix-row">
+      <h3>${escapeHtml(category)} / ${escapeHtml(channel)} <span class="count-pill">${items.length}</span></h3>
+      <div class="mini-list">${items.map((p) => `<div class="mini-item"><span>${escapeHtml(p.id)} ${escapeHtml(p.title)}</span><span>${p.tags.map(escapeHtml).join("、") || "无标签"}</span></div>`).join("") || "当前筛选下无政策"}</div>
+    </section>`;
+  }).join("");
+}
+
+function renderFiles(list) {
+  $("filesView").innerHTML = list.map((p) => {
+    const attach = (p.attachments || []).map((a) => `<a class="attachment" href="${encodePath(a.file)}" download>${escapeHtml(a.label)}</a>`).join("");
+    return `<div class="file-row">
+      <strong>${escapeHtml(p.id)}</strong>
+      <div>
+        <div>${canOpenDetail(p) ? `<a class="inline-link" href="${detailUrl(p)}">${escapeHtml(p.title)}</a>` : escapeHtml(p.title)}</div>
+        <small>${escapeHtml(p.fileName)}</small>
+        ${attach ? `<div class="attachments">${attach}</div>` : ""}
+      </div>
+      ${p.file ? `<a class="download" href="${encodePath(p.file)}" download>下载</a>` : ""}
     </div>`;
   }).join("");
 }
 
-function renderBookmarks() {
-  const favoriteGroups = policyGroups.filter((group) => favorites.has(group.policy.id));
-  const recentGroups = recent.map((id) => policyGroups.find((group) => group.policy.id === id)).filter(Boolean).slice(0, 4);
-  if (!favoriteGroups.length && !recentGroups.length) {
-    $("bookmarkBand").classList.add("hidden");
-    return;
-  }
-  $("bookmarkBand").classList.remove("hidden");
-  $("bookmarkBand").innerHTML = `<div class="section-head"><div><span class="section-kicker">常用入口</span><h2>我的收藏与最近浏览</h2></div></div>
-    <div class="quick-links">
-      ${[...favoriteGroups.slice(0, 4), ...recentGroups].map((group) => `<a href="${detailReady(group.policy) ? detailUrl(group.policy) : "#"}">${escapeHtml(group.policy.id)} ${escapeHtml(group.policy.title)}</a>`).join("")}
-    </div>`;
-}
-
-function updateViews(groups) {
+function updateViews(list) {
   $("cardsView").classList.toggle("hidden", state.view !== "cards");
+  $("analysisView").classList.toggle("hidden", state.view !== "analysis");
   $("graphView").classList.toggle("hidden", state.view !== "graph");
-  $("compareView").classList.toggle("hidden", state.view !== "compare");
+  $("matrixView").classList.toggle("hidden", state.view !== "matrix");
   $("filesView").classList.toggle("hidden", state.view !== "files");
-  if (state.view === "cards") renderCards(groups);
-  if (state.view === "graph") renderGraph(groups);
-  if (state.view === "compare") renderCompare(groups);
-  if (state.view === "files") renderFiles(groups);
+  if (state.view === "cards") renderCards(list);
+  if (state.view === "analysis") renderAnalysis(list);
+  if (state.view === "graph") renderGraph(list);
+  if (state.view === "matrix") renderMatrix(list);
+  if (state.view === "files") renderFiles(list);
 }
 
 function render() {
   const availableChannels = state.category === "全部"
     ? channels
-    : data.channels.filter((item) => item.category === state.category).map((item) => item.channel);
+    : data.channels.filter((c) => c.category === state.category).map((c) => c.channel);
   if (state.channel !== "全部" && !availableChannels.includes(state.channel)) state.channel = "全部";
-  const groups = filteredGroups();
   fillSelect($("categoryFilter"), categories, state.category);
   fillSelect($("channelFilter"), availableChannels, state.channel);
   fillSelect($("tagFilter"), tags, state.tag);
   $("searchInput").value = state.search;
-  $("guideSearch").value = state.search;
-  renderStats(groups);
-  renderFundTiles();
-  renderBookmarks();
-  $("resultCount").textContent = `当前显示 ${groups.length} 条去重政策卡片，共覆盖 ${displayPolicyCount()} 份原始政策文件。`;
-  updateViews(groups);
-}
-
-function setSearch(value) {
-  state.search = value;
-  render();
+  renderNav();
+  const list = policies.filter(byFilter);
+  $("resultCount").textContent = `${list.length} 条政策`;
+  updateViews(list);
 }
 
 function bindEvents() {
-  $("categoryFilter").addEventListener("change", (event) => { state.category = event.target.value; state.channel = "全部"; render(); });
-  $("channelFilter").addEventListener("change", (event) => { state.channel = event.target.value; render(); });
-  $("tagFilter").addEventListener("change", (event) => { state.tag = event.target.value; render(); });
-  $("searchInput").addEventListener("input", (event) => setSearch(event.target.value));
-  $("guideSearch").addEventListener("input", (event) => setSearch(event.target.value));
-  $("guideBtn").addEventListener("click", () => setSearch($("guideSearch").value));
+  $("categoryFilter").addEventListener("change", (e) => { state.category = e.target.value; state.channel = "全部"; render(); });
+  $("channelFilter").addEventListener("change", (e) => { state.channel = e.target.value; render(); });
+  $("tagFilter").addEventListener("change", (e) => { state.tag = e.target.value; render(); });
+  $("searchInput").addEventListener("input", (e) => { state.search = e.target.value; render(); });
   $("resetBtn").addEventListener("click", () => { state = { category: "全部", channel: "全部", tag: "全部", search: "", view: state.view }; render(); });
-  $("clearNavBtn").addEventListener("click", () => { state.category = "全部"; state.channel = "全部"; render(); });
   document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => {
-    document.querySelectorAll(".tab").forEach((item) => item.classList.remove("active"));
+    document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
     tab.classList.add("active");
     state.view = tab.dataset.view;
     render();
   }));
-  document.addEventListener("click", (event) => {
-    const categoryButton = event.target.closest("[data-category]");
-    const channelButton = event.target.closest("[data-channel]");
-    const tagButton = event.target.closest("[data-tag]");
-    const favoriteButton = event.target.closest("[data-favorite]");
-    const policyLink = event.target.closest("[data-policy-link]");
-    if (categoryButton) {
-      state.category = categoryButton.dataset.category;
-      state.channel = "全部";
-      render();
-    }
-    if (channelButton) {
-      state.channel = channelButton.dataset.channel;
-      const found = data.channels.find((item) => item.channel === state.channel);
-      state.category = found?.category || "全部";
-      render();
-    }
-    if (tagButton) {
-      state.tag = tagButton.dataset.tag;
-      render();
-    }
-    if (favoriteButton) {
-      const id = favoriteButton.dataset.favorite;
-      favorites.has(id) ? favorites.delete(id) : favorites.add(id);
-      localStorage.setItem("policyFavorites", JSON.stringify([...favorites]));
-      render();
-    }
-    if (policyLink) {
-      const id = policyLink.dataset.policyLink;
-      recent = [id, ...recent.filter((item) => item !== id)].slice(0, 8);
-      localStorage.setItem("recentPolicies", JSON.stringify(recent));
-    }
-  });
 }
 
+renderStats();
 bindEvents();
 render();
