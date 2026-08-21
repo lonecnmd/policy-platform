@@ -1,4 +1,4 @@
-const policyData = window.POLICY_DATA;
+const policyData = window.POLICY_DATA || { policies: [] };
 const policyAnalysisData = window.POLICY_ANALYSIS || { architectureUnits: [], policyAnalyses: [] };
 const detailRoot = document.getElementById("detailApp");
 const detailParams = new URLSearchParams(window.location.search);
@@ -9,6 +9,24 @@ const allAnalyses = policyAnalysisData.policyAnalyses || [];
 const selectedPolicy = allPolicies.find((policy) => policy.id === selectedId);
 const selectedAnalysis = allAnalyses.find((analysis) => analysis.policyId === selectedId);
 const detailUnitById = new Map((policyAnalysisData.architectureUnits || []).map((unit) => [unit.id, unit]));
+
+function policyDimensions(policy) {
+  return policy.dimensions?.length ? policy.dimensions : [policy.dimension || policy.category].filter(Boolean);
+}
+
+function policyTopics(policy) {
+  return policy.topics?.length ? policy.topics : [policy.topic || policy.channel].filter(Boolean);
+}
+
+function policyLevels(policy) {
+  return policy.policyLevels?.length ? policy.policyLevels : [policy.policyLevel].filter(Boolean);
+}
+
+function policyPlacements(policy) {
+  return policy.placements?.length
+    ? policy.placements
+    : [{ dimension: policy.dimension || policy.category, topic: policy.topic || policy.channel, group: policy.group, subtopic: policy.subtopic, policyLevel: policy.policyLevel }];
+}
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
@@ -26,6 +44,17 @@ function renderChips(values, emptyText = "待补充") {
   return values?.length
     ? values.map((value) => `<span class="chip tag">${escapeHtml(value)}</span>`).join("")
     : `<span class="chip">${escapeHtml(emptyText)}</span>`;
+}
+
+function renderPlacements(policy) {
+  return policyPlacements(policy).map((item) => `
+    <span class="chip placement">${escapeHtml([
+      item.dimension,
+      item.topicLabel || item.topic,
+      item.groupLabel || item.group,
+      item.subtopicLabel || item.subtopic || item.policyLevel,
+    ].filter(Boolean).filter((part, index, parts) => parts.indexOf(part) === index).join(" / "))}</span>
+  `).join("");
 }
 
 function renderDetailFlow(flowDetails) {
@@ -125,7 +154,8 @@ function renderDesignActions(actions) {
 }
 
 function renderRelatedPolicies(policy) {
-  const related = allPolicies.filter((item) => item.channel === policy.channel && item.id !== policy.id).slice(0, 6);
+  const topics = new Set(policyTopics(policy));
+  const related = allPolicies.filter((item) => item.id !== policy.id && policyTopics(item).some((topic) => topics.has(topic))).slice(0, 6);
   return related.length
     ? related.map((item) => {
         const analysis = allAnalyses.find((entry) => entry.policyId === item.id);
@@ -157,13 +187,16 @@ function renderDetail() {
       <a class="back-link" href="index.html">返回平台首页</a>
       <div class="detail-hero-grid">
         <div>
-          <div class="eyebrow">${escapeHtml(selectedPolicy.channel)}</div>
+          <div class="eyebrow">${escapeHtml(policyDimensions(selectedPolicy).join("、"))}</div>
           <h1>${escapeHtml(selectedPolicy.title)}</h1>
           <p>${escapeHtml(selectedPolicy.summary || "待补充解读。")}</p>
+          <div class="placement-row">${renderPlacements(selectedPolicy)}</div>
           <div class="tag-row">${renderChips(selectedPolicy.tags)}</div>
         </div>
         <aside class="detail-side">
-          ${renderMeta("发布单位", selectedAnalysis.issuingAuthority)}
+          ${renderMeta("管理维度", policyDimensions(selectedPolicy).join("、"))}
+          ${renderMeta("制度主题", policyTopics(selectedPolicy).join("、"))}
+          ${renderMeta("政策层级", policyLevels(selectedPolicy).join("、"))}
           ${renderMeta("发布时间", selectedAnalysis.issueDate)}
           ${renderMeta("文号", selectedAnalysis.docNo)}
           ${renderMeta("施行时间", selectedAnalysis.effectiveDate)}

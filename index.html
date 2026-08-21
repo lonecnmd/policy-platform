@@ -3,17 +3,17 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>数字深圳投资政策导航平台</title>
-  <meta name="description" content="按资金类别和资金渠道梳理数字深圳投资政策，支持检索、解读、条款摘录和文件下载。" />
-  <link rel="stylesheet" href="styles.css?v=20260804-2" />
+  <title>数字深圳项目管理政策分析平台</title>
+  <meta name="description" content="按投资管理、预算管理、采购管理和资产管理四个维度，梳理国家、广东省、深圳市三级项目管理政策文件。" />
+  <link rel="stylesheet" href="styles.css?v=20260821-2" />
 </head>
 <body>
   <header class="hero">
     <div class="hero-main">
       <div>
-        <div class="eyebrow">数字深圳投资政策导航</div>
-        <h1>资金渠道政策知识平台</h1>
-        <p>按市本级财政资金、政府债券资金和其他资金三组来源，组织中央预算内投资、中央和省级专项资金、政府投资资金、超长期特别国债（“两重”建设资金）、地方政府专项债券资金、政策性金融资金、不动产投资信托基金和社会投资等八类资金渠道。</p>
+        <div class="eyebrow">数字深圳项目管理政策分析</div>
+        <h1>四维度政策知识平台</h1>
+        <p>围绕投资管理、预算管理、采购管理和资产管理四个维度，梳理国家、广东省、深圳市三级政策文件，并保留投资决策、资金安排、监督评价、预算、采购、资产等制度主题之间的交叉归属。</p>
       </div>
       <div class="hero-actions">
         <a class="ghost-btn" href="#cardsView">浏览政策解读</a>
@@ -25,19 +25,23 @@
 
   <main class="app-shell">
     <aside class="sidebar">
-      <div class="side-title">资金层级导航</div>
+      <div class="side-title">四维度导航</div>
       <div id="navTree"></div>
     </aside>
 
     <section class="content">
       <section class="toolbar" aria-label="筛选工具栏">
         <label>
-          资金类别
+          管理维度
           <select id="categoryFilter"></select>
         </label>
         <label>
-          资金渠道
+          制度主题
           <select id="channelFilter"></select>
+        </label>
+        <label>
+          政策层级
+          <select id="levelFilter"></select>
         </label>
         <label>
           标签
@@ -49,15 +53,16 @@
         </label>
         <button id="resetBtn" type="button">重置</button>
       </section>
+      <div id="activeScope" class="active-scope hidden"></div>
 
       <section class="flow-band" aria-label="资金政策理解路径">
-        <div class="flow-title">查看路径</div>
+        <div class="flow-title">分析路径</div>
         <div class="flow">
-          <span>资金类别</span>
+          <span>管理维度</span>
           <b></b>
-          <span>资金渠道</span>
+          <span>政策层级</span>
           <b></b>
-          <span>政策文件</span>
+          <span>制度主题</span>
           <b></b>
           <span>政策任务</span>
           <b></b>
@@ -71,7 +76,7 @@
         <button class="tab active" data-view="cards" type="button">政策卡片</button>
         <button class="tab" data-view="analysis" type="button">政策解读</button>
         <button class="tab" data-view="graph" type="button">图谱框架</button>
-        <button class="tab" data-view="matrix" type="button">渠道矩阵</button>
+        <button class="tab" data-view="matrix" type="button">维度矩阵</button>
         <button class="tab" data-view="files" type="button">文件下载</button>
         <span id="resultCount"></span>
       </section>
@@ -84,8 +89,8 @@
     </section>
   </main>
 
-  <script src="data.js?v=20260804-2"></script>
-  <script src="analysis-data.js?v=20260804-2"></script>
-  <script src="app.js?v=20260804-2"></script>
+  <script src="data.js?v=20260821-2"></script>
+  <script src="analysis-data.js?v=20260821-2"></script>
+  <script src="app.js?v=20260821-2"></script>
 </body>
 </html>
